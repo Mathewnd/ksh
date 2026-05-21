@@ -48,7 +48,7 @@ tst	note{ reading compile-time ksh options from SHOPT.sh }end run{
 
 	# the SHOPT.sh file calls the SHOPT function once for each option
 	echo ''
-	. "$PACKAGEROOT/src/cmd/ksh93/SHOPT.sh"
+	. "${KSH_SHOPT_FILE:-$PACKAGEROOT/src/cmd/ksh93/SHOPT.sh}"
 
 	# cosmetic: position iffe's "yes"
 	printf '\n...' >&9

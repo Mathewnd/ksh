@@ -1,0 +1,236 @@
+#! /bin/sh
+#
+# Autoconf build driver for ksh93.
+#
+# This is intentionally small: configure owns option parsing and policy, while
+# this script maps the configured Autoconf environment onto the existing ksh93
+# source tree and install/test conventions.
+
+set -eu
+
+action=${1:-all}
+srcdir='@abs_top_srcdir@'
+builddir='@abs_top_builddir@'
+if test "$srcdir" = "$builddir"
+then
+	packageroot=$srcdir
+else
+	packageroot=$builddir/package-root
+fi
+prefix='@prefix@'
+exec_prefix='@exec_prefix@'
+bindir='@bindir@'
+includedir='@includedir@'
+datarootdir='@datarootdir@'
+datadir='@datadir@'
+mandir='@mandir@'
+
+eval "exec_prefix=\"$exec_prefix\""
+eval "bindir=\"$bindir\""
+eval "includedir=\"$includedir\""
+eval "datarootdir=\"$datarootdir\""
+eval "datadir=\"$datadir\""
+eval "mandir=\"$mandir\""
+
+CC='@CC@'
+CC_FOR_BUILD='@CC_FOR_BUILD@'
+CFLAGS='@CFLAGS@'
+CFLAGS_FOR_BUILD='@CFLAGS_FOR_BUILD@'
+CPPFLAGS='@CPPFLAGS@'
+LDFLAGS='@LDFLAGS@'
+LIBS='@LIBS@ @MATH_LIBS@ @DL_LIBS@'
+KSH_ENABLE_SHARED='@KSH_ENABLE_SHARED@'
+KSH_ENABLE_STATIC='@KSH_ENABLE_STATIC@'
+KSH_ENABLE_DEBUG='@KSH_ENABLE_DEBUG@'
+KSH_AUTOCONF_CROSS='@KSH_AUTOCONF_CROSS@'
+KSH_SHOPT_AUDIT='@KSH_SHOPT_AUDIT@'
+KSH_SHOPT_SYSRC='@KSH_SHOPT_SYSRC@'
+KSH_SHOPT_MULTIBYTE='@KSH_SHOPT_MULTIBYTE@'
+KSH_AUDIT_FILE='@KSH_AUDIT_FILE@'
+INSTALL='@INSTALL@'
+
+export CC LDFLAGS
+KSH_BUILD_CC=$CC_FOR_BUILD
+KSH_BUILD_CFLAGS=$CFLAGS_FOR_BUILD
+export KSH_BUILD_CC KSH_BUILD_CFLAGS
+export KSH_AUTOCONF_CROSS
+HOSTTAG=${HOSTTAG-autoconf}
+export HOSTTAG
+KSH_SHOPT_FILE=$builddir/autoconf-SHOPT.sh
+export KSH_SHOPT_FILE
+
+generate_shopt()
+{
+	test -d "$builddir" || mkdir -p "$builddir"
+	tmp=$KSH_SHOPT_FILE.tmp
+	awk \
+		-v audit="$KSH_SHOPT_AUDIT" \
+		-v sysrc="$KSH_SHOPT_SYSRC" \
+		-v multibyte="$KSH_SHOPT_MULTIBYTE" \
+		-v audit_file="$KSH_AUDIT_FILE" '
+	BEGIN {
+		gsub(/"/, "\\\"", audit_file)
+	}
+	$1 == "SHOPT" && $2 ~ /^AUDIT=/ {
+		print "SHOPT AUDIT=" audit "\t\t\t\t# enable auditing per SHOPT_AUDITFILE"
+		next
+	}
+	$1 == "SHOPT" && $2 ~ /^AUDITFILE=/ {
+		print "SHOPT AUDITFILE='\''\"" audit_file "\"'\''\t# auditing file"
+		next
+	}
+	$1 == "SHOPT" && $2 ~ /^MULTIBYTE=/ {
+		print "SHOPT MULTIBYTE=" multibyte "\t\t\t# multibyte character handling"
+		next
+	}
+	$1 == "SHOPT" && $2 ~ /^SYSRC=/ {
+		print "SHOPT SYSRC=" sysrc "\t\t\t\t# attempt . /etc/ksh.kshrc if interactive"
+		next
+	}
+	{ print }
+	' "$srcdir/src/cmd/ksh93/SHOPT.sh" > "$tmp"
+	if test -f "$KSH_SHOPT_FILE" && cmp -s "$tmp" "$KSH_SHOPT_FILE"
+	then
+		rm -f "$tmp"
+		KSH_SHOPT_CHANGED=0
+	else
+		mv -f "$tmp" "$KSH_SHOPT_FILE"
+		KSH_SHOPT_CHANGED=1
+	fi
+}
+
+invalidate_shopt_features()
+{
+	host=$(configured_arch)
+	rm -f "$packageroot/arch/$host/src/cmd/ksh93/FEATURE/options"
+}
+
+prepare_packageroot()
+{
+	test "$packageroot" = "$srcdir" && return 0
+	test -d "$packageroot" || mkdir -p "$packageroot"
+	for path in ANNOUNCE COPYRIGHT LICENSE.md NEWS README.md TODO bin docs src
+	do
+		if test -e "$srcdir/$path" && test ! -e "$packageroot/$path"
+		then
+			ln -s "$srcdir/$path" "$packageroot/$path"
+		fi
+	done
+}
+
+package_build()
+{
+	prepare_packageroot
+	cd "$packageroot"
+	generate_shopt
+	case ${1:-} in
+	make)	invalidate_shopt_features ;;
+	esac
+	ccflags=$CFLAGS
+	test -z "$CPPFLAGS" || ccflags="$ccflags $CPPFLAGS"
+	if test "$KSH_ENABLE_DEBUG" = 1
+	then
+		set -- debug "$@"
+	fi
+	if test "$KSH_ENABLE_SHARED" = 0
+	then
+		AST_NO_DYLIB=1
+		export AST_NO_DYLIB
+	fi
+	CCFLAGS=$ccflags
+	export CCFLAGS
+	"$packageroot/bin/package" "$@"
+}
+
+configured_arch()
+{
+	prepare_packageroot
+	cd "$packageroot"
+	HOSTTAG=$HOSTTAG
+	export HOSTTAG
+	"$packageroot/bin/package" host type
+}
+
+install_one()
+{
+	src=$1
+	dst=$2
+	mode=$3
+	test -f "$src" || return 0
+	dir=${dst%/*}
+	test -d "$dir" || mkdir -p "$dir"
+	case $mode in
+	x) @INSTALL_PROGRAM@ "$src" "$dst" ;;
+	*) @INSTALL_DATA@ "$src" "$dst" ;;
+	esac
+}
+
+case $action in
+all)
+	package_build make
+	;;
+check)
+	package_build make
+	package_build test
+	;;
+install)
+	host=$(configured_arch)
+	root=$packageroot/arch/$host
+	if test ! -x "$root/bin/ksh" || test ! -x "$root/bin/shcomp"
+	then
+		package_build make
+	fi
+	dest=${DESTDIR-}
+	install_one "$root/bin/ksh" "$dest$bindir/ksh" x
+	install_one "$root/bin/shcomp" "$dest$bindir/shcomp" x
+	install_one "$srcdir/src/cmd/ksh93/sh.1" "$dest$mandir/man1/ksh.1" d
+	install_one "$srcdir/src/cmd/ksh93/shell.3" "$dest$mandir/man3/shell.3ast" d
+	install_one "$srcdir/src/cmd/ksh93/nval.3" "$dest$mandir/man3/nval.3ast" d
+	if test -d "$root/include/ast"
+	then
+		mkdir -p "$dest$includedir"
+		rm -rf "$dest$includedir/ast"
+		cp -R "$root/include/ast" "$dest$includedir/ast"
+	fi
+	if test -d "$srcdir/src/cmd/ksh93/fun"
+	then
+		mkdir -p "$dest$datadir/ksh/fun"
+		cp "$srcdir"/src/cmd/ksh93/fun/* "$dest$datadir/ksh/fun/"
+		chmod a+x "$dest"$datadir/ksh/fun/* 2>/dev/null || :
+	fi
+	;;
+uninstall)
+	rm -f "${DESTDIR-}$bindir/ksh" "${DESTDIR-}$bindir/shcomp"
+	rm -f "${DESTDIR-}$mandir/man1/ksh.1" "${DESTDIR-}$mandir/man3/shell.3ast" "${DESTDIR-}$mandir/man3/nval.3ast"
+	rm -rf "${DESTDIR-}$includedir/ast" "${DESTDIR-}$datadir/ksh/fun"
+	;;
+clean)
+	prepare_packageroot
+	cd "$packageroot"
+	"$packageroot/bin/package" clean
+	;;
+show-config)
+	printf '%s\n' \
+		"srcdir=$srcdir" \
+		"builddir=$builddir" \
+		"packageroot=$packageroot" \
+		"CC=$CC" \
+		"CC_FOR_BUILD=$CC_FOR_BUILD" \
+		"CFLAGS=$CFLAGS" \
+		"CFLAGS_FOR_BUILD=$CFLAGS_FOR_BUILD" \
+		"CPPFLAGS=$CPPFLAGS" \
+		"LDFLAGS=$LDFLAGS" \
+		"LIBS=$LIBS" \
+		"KSH_AUTOCONF_CROSS=$KSH_AUTOCONF_CROSS" \
+		"KSH_ENABLE_SHARED=$KSH_ENABLE_SHARED" \
+		"KSH_ENABLE_STATIC=$KSH_ENABLE_STATIC" \
+		"KSH_SHOPT_AUDIT=$KSH_SHOPT_AUDIT" \
+		"KSH_SHOPT_SYSRC=$KSH_SHOPT_SYSRC" \
+		"KSH_SHOPT_MULTIBYTE=$KSH_SHOPT_MULTIBYTE" \
+		"KSH_AUDIT_FILE=$KSH_AUDIT_FILE"
+	;;
+*)
+	echo "$0: unknown action: $action" >&2
+	exit 2
+	;;
+esac

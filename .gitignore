@@ -3,6 +3,21 @@ arch
 tgz
 lcl
 
+# Autoconf generated build files
+Makefile
+autom4te.cache/
+autoconf-SHOPT.sh
+build-aux/config.guess
+build-aux/config.sub
+build-aux/autoconf-build
+build-aux/install-sh
+config.h
+config.h.in
+config.log
+config.status
+configure
+stamp-h1
+
 # Flat make libs, binaries, etc
 *.a
 *.o

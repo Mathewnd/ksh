@@ -25,6 +25,7 @@ To see what's left to fix, see [the issue tracker](https://github.com/ksh93/ksh/
 * [Installing from source](#user-content-installing-from-source)
     * [Supported systems](#user-content-supported-systems)
     * [Prepare](#user-content-prepare)
+    * [Generate configure](#user-content-generate-configure)
     * [Build](#user-content-build)
     * [Test](#user-content-test)
     * [Install](#user-content-install)
@@ -122,7 +123,10 @@ The build system requires only a basic POSIX-compatible shell, utilities and
 compiler environment. The `cc`, `ar` and `getconf` commands are needed at
 build time. The `tput` and `getconf` commands are used at runtime if
 available (for multiline editing and to complete the `getconf` built-in,
-respectively). Not all systems come with all of these preinstalled. Here are
+respectively).
+
+Git checkouts also require Autoconf. Release tarballs may already include the
+generated files. Not all systems come with all of these preinstalled. Here are
 system-specific instructions for making them available:
 
 * **Android/[Termux](https://termux.dev/):**
@@ -134,61 +138,68 @@ system-specific instructions for making them available:
   `xcode-select --install`
 * (to be completed)
 
+### Generate configure
+
+From a git checkout, run this after cloning and after editing
+`configure.ac`, `Makefile.in`, or `build-aux/autoconf-build.in`:
+
+```
+autoreconf -fi
+```
+
 ### Build
 
-To build ksh with a custom configuration of features, edit
-[`src/cmd/ksh93/SHOPT.sh`](https://github.com/ksh93/ksh/blob/dev/src/cmd/ksh93/SHOPT.sh).
+To build ksh:
+
+```
+./configure
+make
+```
+
+Common ksh build options:
+
+```
+./configure --disable-sysrc --enable-multibyte
+```
 
 On systems such as NetBSD and OpenBSD, where `/bin/ksh` is not ksh93 and the
 preinstalled `/etc/ksh.kshrc` profile script is incompatible with ksh93, you'll
-want to disable `SHOPT_SYSRC` to avoid loading it on startup -- unless you can
-edit it to make it compatible with ksh93. This generally involves differences
-in the declaration and usage of local variables in functions.
+want to use `./configure --disable-sysrc` to avoid loading it on startup --
+unless you can edit it to make it compatible with ksh93. This generally
+involves differences in the declaration and usage of local variables in
+functions.
 
-Then `cd` to the top directory and run:
+The generated binaries are stored in the `arch` directory, in an Autoconf-tagged
+subdirectory such as `arch/linux.i386-64,autoconf`.
 
-```
-bin/package make
-```
-
-To suppress compiler output, use `quiet make` instead of `make`.
-
-In some non-POSIX shells you might need to prepend `sh` to all calls to `bin/package`.
-
-Parallel building is supported by appending `-j` followed by the
-desired maximum number of concurrent jobs, e.g., `bin/package make -j4`.
-This speeds up building on systems with more than one CPU core.
-(Type `bin/package host cpu` to find out how many CPU cores your system has.)
-
-The compiled binaries are stored in the `arch` directory, in a subdirectory
-that corresponds to your architecture. The command `bin/package host type`
-outputs the name of this subdirectory.
-
-Dynamically linked binaries, if supported for your system, are stored in
-`dyn/bin` and `dyn/lib` subdirectories of your architecture directory.
-If built, they are built in addition to the statically linked versions.
-Export `AST_NO_DYLIB` to deactivate building dynamically linked versions.
-
-If you have trouble or want to tune the binaries, you may pass additional
-compiler and linker flags. It is usually best to export these as environment
-variables *before* running `bin/package` as they could change the name of
-the build subdirectory of the `arch` directory, so exporting them is a
-convenient way to keep them consistent between build and test commands.
-**Note that this system uses `CCFLAGS` instead of the usual `CFLAGS`.**
-An example that makes Solaris Studio cc produce a 64-bit binary:
+To build without dynamically linked artifacts:
 
 ```
-export CCFLAGS="-m64 -O" LDFLAGS="-m64"
-bin/package make
+./configure --disable-shared
 ```
 
-Alternatively you can append these to the command, and they will only be
-used for that command. You can also specify an alternative shell in which
-to run the build scripts this way. For example:
+Cross-compiling is intentionally strict. If `configure` detects
+`--host`/`--build` cross-compilation, set `ksh_cv_cross_feature_cache=yes` in
+`CONFIG_SITE` or `config.cache` to acknowledge that target feature answers are
+being supplied externally. The legacy iffe probes must not guess by running
+target binaries on the build machine.
+
+Compiler and linker settings:
 
 ```
-bin/package make SHELL=/bin/bash CCFLAGS="-O2 -I/opt/local/include" LDFLAGS="-L/opt/local/lib"
+./configure CC=cc CFLAGS="-m64 -O" LDFLAGS="-m64"
+make
 ```
+
+For cross builds, `CC` is the target compiler and `CC_FOR_BUILD` is used for
+build-machine bootstrap tools:
+
+```
+CONFIG_SITE=/path/to/config.site ./configure --host=x86_64-astral CC=x86_64-astral-gcc CC_FOR_BUILD=cc
+```
+
+The legacy `CCFLAGS` variable is still accepted by `configure` and appended to
+`CFLAGS` for compatibility.
 
 **Note:** Do not add compiler flags that cause the compiler to emit terminal
 escape codes, such as `-fdiagnostics-color=always`; this will cause the
@@ -196,22 +207,13 @@ build to fail as the probing code greps compiler diagnostics. Additionally,
 do not add the `-ffast-math` compiler flag; arithmetic bugs will occur when
 using that flag.
 
-For more information run
-
-```
-bin/package help
-```
-
-Many other commands in this repo self-document via the `--help`, `--man` and
-`--html` options; those that do have no separate manual page.
-
 ### Test
 
 After compiling, you can run the regression tests.
 To run the default test sets for ksh and the build system, use:
 
 ```
-bin/package test
+make check
 ```
 
 For ksh, use the `shtests` command directly to control the regression test runs.
@@ -222,40 +224,30 @@ bin/shtests --man
 ```
 
 To hand-test ksh (as well as the utilities and the autoloadable functions
-that come with it) without installing, run:
+that come with it) without installing, run the built binary directly from the
+Autoconf-tagged `arch` directory, for example:
 
 ```
-bin/package use
+arch/linux.i386-64,autoconf/bin/ksh
 ```
 
 ### Install
 
-Usage: `bin/package install` *install_root_directory* [ *command* ... ]
+Use the standard install target:
 
-Any command from the `arch` directory can be installed. If no *command* is
-specified, `ksh` and `shcomp` are assumed.
+```
+make install
+```
 
-The *install_root_directory* is the directory from which the command(s) will
-actually be run. It will be created if it does not exist. Commands are
-installed into its `bin` subdirectory, any shared libraries into `lib`, C
-development header files into `include/ast`, and each command's manual page,
-if available, is installed into `share/man`.
+Commands are installed under `bindir`, public C development headers under
+`includedir/ast`, shell functions under `datadir/ksh/fun`, and manual pages
+under `mandir`.
 
-If a dynamically linked version of ksh and associated commands has been
-built, then the `install` subcommand will prefer that: commands, dynamic
-libraries and associated header files will be installed then. To install the
-statically linked version instead (and skip the header files), either delete
-the `dyn` subdirectory, or export `AST_NO_DYLIB=y` before building to prevent
-it from being created in the first place.
+Packagers can stage an install with `DESTDIR`:
 
-An additional install prefix directory path can be passed in `DESTDIR`, which
-can be either passed as an environment variable or specified on the comannd
-line as an extra assignment-like argument. The value of `DESTDIR` will be
-prefixed to the path of every destination file when installing it, but not
-when configuring the install root directory in the installed files (as may be
-required by individual systems, e.g., to find dynamic libraries). This feature
-is designed for packagers who need to install ksh into a directory other than
-the one from which it will be run in order to package it.
+```
+make DESTDIR="$PWD/stage" install
+```
 
 ## What is ksh93?
 

@@ -2017,10 +2017,14 @@ case $x in
 				cat pkg$$.e
 				err_out "$CC: failed to compile and link $INITROOT/hello.c -- is it a C compiler?"
 			fi
-			./pkg$$.exe >/dev/null 2>&1 || err_out \
-				"Cross-compiling is not supported. $CC seems to be a cross-compiler." \
-				"If not, your $TMPDIR directory may be mounted without execute permission." \
-				"Try exporting TMPDIR as a directory where you can execute binary files."
+			case ${KSH_AUTOCONF_CROSS-} in
+			1)	;;
+			*)	./pkg$$.exe >/dev/null 2>&1 || err_out \
+					"Cross-compiling is not supported. $CC seems to be a cross-compiler." \
+					"If not, your $TMPDIR directory may be mounted without execute permission." \
+					"Try exporting TMPDIR as a directory where you can execute binary files."
+				;;
+			esac
 		) || exit
 		;;
 	esac
@@ -2183,6 +2187,15 @@ done
 
 checkaout()	# cmd ...
 {
+	bootstrap_cc=$CC
+	bootstrap_flags=$CCFLAGS
+	bootstrap_ldflags=$LDFLAGS
+	case ${KSH_AUTOCONF_CROSS-} in
+	1)	bootstrap_cc=${KSH_BUILD_CC:-cc}
+		bootstrap_flags=${KSH_BUILD_CFLAGS-}
+		bootstrap_ldflags=
+		;;
+	esac
 	for i
 	do	if	test ! -e "$INSTALLROOT/bin/$i" || test "$INITROOT/$i.c" -nt "$INSTALLROOT/bin/$i"
 		then	note "update $INSTALLROOT/bin/$i"
@@ -2193,10 +2206,10 @@ checkaout()	# cmd ...
 				# Windows/Cygwin kills fork(2) after deleting *or* renaming an executable that's in use :-/
 				# To allow relinking the binary against libast later, add a _bootstrap suffix and create
 				# a symlink to it. The symlink can be removed/renamed instead of the _bootstrap binary.
-				$exec $CC -O $CCFLAGS $LDFLAGS -o "$INSTALLROOT/bin/${i}_bootstrap" "$INITROOT/$i.c" || exit
+				$exec $bootstrap_cc -O $bootstrap_flags $bootstrap_ldflags -o "$INSTALLROOT/bin/${i}_bootstrap" "$INITROOT/$i.c" || exit
 				$exec ln -sf "${i}_bootstrap" "$INSTALLROOT/bin/$i" || exit
 				;;
-			*)	$exec $CC -O $CCFLAGS $LDFLAGS -o "$INSTALLROOT/bin/$i" "$INITROOT/$i.c" || exit
+			*)	$exec $bootstrap_cc -O $bootstrap_flags $bootstrap_ldflags -o "$INSTALLROOT/bin/$i" "$INITROOT/$i.c" || exit
 				;;
 			esac
 			test -f $i.o && $exec rm -f $i.o
