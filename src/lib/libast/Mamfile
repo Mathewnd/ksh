@@ -606,7 +606,10 @@ make install virtual
 			done
 			make lcgen
 				makp port/lcgen.c
-				exec - %{CC} %{CCLDFLAGS} %{CCFLAGS} %{mam_cc_NOSTRICTALIASING} %{LDFLAGS} -o lcgen port/lcgen.c
+				exec - case ${KSH_AUTOCONF_CROSS-} in
+				exec - 1) ${KSH_BUILD_CC:-cc} ${KSH_BUILD_CFLAGS-} -o lcgen port/lcgen.c ;;
+				exec - *) %{CC} %{CCLDFLAGS} %{CCFLAGS} %{mam_cc_NOSTRICTALIASING} %{LDFLAGS} -o lcgen port/lcgen.c ;;
+				exec - esac
 			done
 			makp port/lc.tab
 			setv _run_lcgen_ lcgen lc.h lctab.c < port/lc.tab
@@ -3743,8 +3746,11 @@ make install virtual
 		note * this helps to ensure that the package.sh-built version gets overwritten.
 		note *
 		note * macOS throws code signature error if 'cp' overwrites Mach-O binary; must remove first
-		exec - (set +f; exec rm -rf %{INSTALLROOT}/bin/%{@} %{INSTALLROOT}/bin/%{@}.*)
-		exec - cp %{@} %{INSTALLROOT}/bin/%{@}
+		exec - case ${KSH_AUTOCONF_CROSS-} in
+		exec - 1) : cross-compiling: keep bootstrap mamake ;;
+		exec - *) (set +f; exec rm -rf %{INSTALLROOT}/bin/%{@} %{INSTALLROOT}/bin/%{@}.*)
+		exec -    cp %{@} %{INSTALLROOT}/bin/%{@} ;;
+		exec - esac
 	done
 done install
 

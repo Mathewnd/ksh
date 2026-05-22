@@ -468,6 +468,13 @@ checkcc()
 
 execute()
 {
+	case ${KSH_AUTOCONF_CROSS-} in
+	1)	case $1 in
+		*.sh)	;;
+		*)	return 1 ;;
+		esac
+		;;
+	esac
 	case $verbose in
 	0)	"$@" 9>&$nullout ;;
 	*)	"$@" 9>&$stderr ;;
@@ -3161,8 +3168,20 @@ $src
 					;;
 				no[ls]*);;
 				[ls]*)	e=0 && break ;;
-				noo*)	execute $tmp.exe <&$nullin >$tmp.out || break ;;
-				o*)	execute $tmp.exe <&$nullin >$tmp.out && e=0 && break ;;
+				noo*)	case ${KSH_AUTOCONF_CROSS-} in
+					1)	: > $tmp.out
+						;;
+					*)	execute $tmp.exe <&$nullin >$tmp.out || break
+						;;
+					esac
+					;;
+				o*)	case ${KSH_AUTOCONF_CROSS-} in
+					1)	: > $tmp.out && e=0 && break
+						;;
+					*)	execute $tmp.exe <&$nullin >$tmp.out && e=0 && break
+						;;
+					esac
+					;;
 				no*)	execute $tmp.exe <&$nullin >&$nullout || break ;;
 				*)	execute $tmp.exe <&$nullin >&$nullout && e=0 && break ;;
 
@@ -4002,9 +4021,20 @@ $usr
 $inc"
 						cat $a
 						} > $tmp.c
-						compile $cc -o $tmp.exe $tmp.c $lib $deflib <&$nullin >&$stderr 2>&$stderr &&
-						$executable $tmp.exe &&
-						execute $tmp.exe $opt <&$nullin
+						case ${KSH_AUTOCONF_CROSS-} in
+						1)	case $cc in
+							*" "*)	nativecc="${KSH_BUILD_CC:-cc} ${KSH_BUILD_CFLAGS-} ${cc#* }" ;;
+							*)	nativecc="${KSH_BUILD_CC:-cc} ${KSH_BUILD_CFLAGS-}" ;;
+							esac
+							compile $nativecc -o $tmp.exe $tmp.c $lib $deflib <&$nullin >&$stderr 2>&$stderr &&
+							$executable $tmp.exe &&
+							"$tmp.exe" $opt <&$nullin
+							;;
+						*)	compile $cc -o $tmp.exe $tmp.c $lib $deflib <&$nullin >&$stderr 2>&$stderr &&
+							$executable $tmp.exe &&
+							execute $tmp.exe $opt <&$nullin
+							;;
+						esac
 						;;
 					*.sh)	{
 						copy - ":
@@ -4163,9 +4193,14 @@ struct xxx* f(void) { return &v; }"
 					esac
 					} > $tmp.c
 					rm -f $tmp.exe
-					compile $cc -o $tmp.exe $tmp.c $lib $deflib <&$nullin >&$nullout &&
-					$executable $tmp.exe &&
-					execute $tmp.exe
+					if	compile $cc -o $tmp.exe $tmp.c $lib $deflib <&$nullin >&$nullout &&
+						$executable $tmp.exe
+					then	case ${KSH_AUTOCONF_CROSS-} in
+						1)	true ;;
+						*)	execute $tmp.exe ;;
+						esac
+					else	false
+					fi
 					report $? 1 "$x$v is a type" "$x$v is not a type" "default for type $x$v"
 					;;
 				val)	case $arg in

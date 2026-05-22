@@ -198,6 +198,11 @@ build-machine bootstrap tools:
 CONFIG_SITE=/path/to/config.site ./configure --host=x86_64-astral CC=x86_64-astral-gcc CC_FOR_BUILD=cc
 ```
 
+The Autoconf cross path does not execute target binaries. The build maps the
+Autoconf host triplet to the legacy package `HOSTTYPE`, builds bootstrap tools
+with `CC_FOR_BUILD`, and uses conservative compile/link-only answers for legacy
+probes that previously executed test binaries.
+
 The legacy `CCFLAGS` variable is still accepted by `configure` and appended to
 `CFLAGS` for compatibility.
 

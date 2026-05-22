@@ -1,6 +1,13 @@
 ref	-D_def_map_ast=1
 key	signed
 
+tst	- cross{
+	test "${KSH_AUTOCONF_CROSS-}" = 1 || exit 0
+	cat <<'!'
+	#define _ptr_bits	(__SIZEOF_POINTER__ * 8)
+!
+}end
+
 tst	- note{ number of bits in pointer }end output{
 	#include <stdio.h>
 	int
@@ -10,6 +17,10 @@ tst	- note{ number of bits in pointer }end output{
 		return 0;
 	}
 }end fail{
+	if test "${KSH_AUTOCONF_CROSS-}" = 1
+	then
+		exit 0
+	fi
 	echo "$0: Output block failed to compile. Export IFFEFLAGS=-d1 to debug." >&2
 	exit 1
 }end

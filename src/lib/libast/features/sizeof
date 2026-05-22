@@ -11,6 +11,10 @@ tst	- note{ sizeof(integral-type) }end output{
 		return 0;
 	}
 }end fail{
+	if test "${KSH_AUTOCONF_CROSS-}" = 1
+	then
+		exit 0
+	fi
 	echo "$0: Output block failed to compile. Export IFFEFLAGS=-d1 to debug." >&2
 	exit 1
 }end

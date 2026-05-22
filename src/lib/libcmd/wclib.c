@@ -34,6 +34,9 @@
 
 #else
 
+#ifndef wint_t
+#define wint_t		int
+#endif
 #ifndef iswspace
 #define iswspace(x)	isspace(x)
 #endif

@@ -39,6 +39,10 @@ CFLAGS_FOR_BUILD='@CFLAGS_FOR_BUILD@'
 CPPFLAGS='@CPPFLAGS@'
 LDFLAGS='@LDFLAGS@'
 LIBS='@LIBS@ @MATH_LIBS@ @DL_LIBS@'
+AR='@AR@'
+RANLIB='@RANLIB@'
+KSH_AUTOCONF_HOST='@host@'
+KSH_AUTOCONF_HOST_OS='@host_os@'
 KSH_ENABLE_SHARED='@KSH_ENABLE_SHARED@'
 KSH_ENABLE_STATIC='@KSH_ENABLE_STATIC@'
 KSH_ENABLE_DEBUG='@KSH_ENABLE_DEBUG@'
@@ -49,11 +53,11 @@ KSH_SHOPT_MULTIBYTE='@KSH_SHOPT_MULTIBYTE@'
 KSH_AUDIT_FILE='@KSH_AUDIT_FILE@'
 INSTALL='@INSTALL@'
 
-export CC LDFLAGS
+export CC CPPFLAGS LDFLAGS LIBS AR RANLIB
 KSH_BUILD_CC=$CC_FOR_BUILD
 KSH_BUILD_CFLAGS=$CFLAGS_FOR_BUILD
 export KSH_BUILD_CC KSH_BUILD_CFLAGS
-export KSH_AUTOCONF_CROSS
+export KSH_AUTOCONF_CROSS KSH_AUTOCONF_HOST KSH_AUTOCONF_HOST_OS KSH_ENABLE_SHARED
 HOSTTAG=${HOSTTAG-autoconf}
 export HOSTTAG
 KSH_SHOPT_FILE=$builddir/autoconf-SHOPT.sh
@@ -118,10 +122,24 @@ prepare_packageroot()
 	done
 }
 
+configured_arch()
+{
+	prepare_packageroot
+	cd "$packageroot"
+	HOSTTAG=$HOSTTAG
+	export HOSTTAG
+	case $KSH_AUTOCONF_CROSS in
+	1)	"$packageroot/bin/package" host canon "$KSH_AUTOCONF_HOST" ;;
+	*)	"$packageroot/bin/package" host type ;;
+	esac
+}
+
 package_build()
 {
 	prepare_packageroot
 	cd "$packageroot"
+	HOSTTYPE=$(configured_arch)
+	export HOSTTYPE
 	generate_shopt
 	case ${1:-} in
 	make)	invalidate_shopt_features ;;
@@ -140,15 +158,6 @@ package_build()
 	CCFLAGS=$ccflags
 	export CCFLAGS
 	"$packageroot/bin/package" "$@"
-}
-
-configured_arch()
-{
-	prepare_packageroot
-	cd "$packageroot"
-	HOSTTAG=$HOSTTAG
-	export HOSTTAG
-	"$packageroot/bin/package" host type
 }
 
 install_one()

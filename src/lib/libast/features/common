@@ -98,6 +98,79 @@ tst	ast_LL note{ LL numeric suffix supported }end compile{
 	unsigned int u = 1ULL; /* NOTE: some compilers choke on 1LLU */
 }end
 
+tst	- cross{
+	test "${KSH_AUTOCONF_CROSS-}" = 1 || exit 0
+	cat <<'!'
+	/* conservative Autoconf cross-compilation defaults */
+	#define _ast_int1_t		char
+	#define _ast_int2_t		short
+	#define _ast_int4_t		int
+	#if defined(__SIZEOF_LONG__) && __SIZEOF_LONG__ == 8
+	#define _ast_int8_t		long
+	#define _ast_int8_str		"long"
+	#define _ast_intmax_t		long
+	#define _ast_flt_unsigned_max_t	unsigned long
+	#define _ast_intmax_long		1
+	#else
+	#define _ast_int8_t		long long
+	#define _ast_int8_str		"long long"
+	#define _ast_intmax_t		long long
+	#define _ast_flt_unsigned_max_t	unsigned long long
+	#endif
+	#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#define _ast_intswap		7
+	#else
+	#define _ast_intswap		0
+	#endif
+
+	#define _ast_sizeof_short	__SIZEOF_SHORT__	/* sizeof(short) */
+	#define _ast_sizeof_int		__SIZEOF_INT__	/* sizeof(int) */
+	#define _ast_sizeof_long	__SIZEOF_LONG__	/* sizeof(long) */
+	#define _ast_sizeof_size_t	__SIZEOF_SIZE_T__	/* sizeof(size_t) */
+	#define _ast_sizeof_pointer	__SIZEOF_POINTER__	/* sizeof(pointer) */
+	#define _ast_sizeof_float	__SIZEOF_FLOAT__	/* sizeof(float) */
+	#define _ast_sizeof_double	__SIZEOF_DOUBLE__	/* sizeof(double) */
+	#define _ast_sizeof_long_double	__SIZEOF_LONG_DOUBLE__	/* sizeof(long double) */
+
+	#define _ast_flt4_t		float
+	#define _ast_flt8_t		double
+	#if defined(__SIZEOF_LONG_DOUBLE__) && defined(__SIZEOF_DOUBLE__) && __SIZEOF_LONG_DOUBLE__ > __SIZEOF_DOUBLE__
+	#if __SIZEOF_LONG_DOUBLE__ == 16
+	#define _ast_flt16_t		long double
+	#define _ast_fltmax_t		_ast_flt16_t
+	#elif __SIZEOF_LONG_DOUBLE__ == 12
+	#define _ast_flt12_t		long double
+	#define _ast_fltmax_t		_ast_flt12_t
+	#else
+	#define _ast_fltmax_t		long double
+	#endif
+	#else
+	#define _ast_fltmax_t		_ast_flt8_t
+	#define _ast_fltmax_double		1
+	#endif
+
+	#ifndef va_listref
+	#ifndef va_start
+	#include <stdarg.h>
+	#endif
+	#define va_listref(p) (&(p))	/* pass va_list to varargs function */
+	#define va_listval(p) (*(p))	/* retrieve va_list from va_arg(ap,va_listarg) */
+	#define va_listarg va_list*	/* va_arg() va_list type */
+	#if !defined(va_copy) && defined(__va_copy)
+	#define va_copy(to,fr) __va_copy(to,fr)	/* copy va_list fr -> to */
+	#endif
+	#endif
+
+	#ifndef UNREACHABLE
+	#if defined(__GNUC__) || defined(__clang__)
+	#define UNREACHABLE()	__builtin_unreachable()
+	#else
+	#define UNREACHABLE()	abort()
+	#endif
+	#endif
+!
+}end
+
 tst	- -DN=1 - -DN=2 - -DN=3 - -DN=4 - -DN=5 - -DN=6 - -DN=7 - -DN=8 - -DN=0 output{
 	#define _BYTESEX_H
 

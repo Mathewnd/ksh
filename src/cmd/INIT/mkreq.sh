@@ -62,6 +62,9 @@ try_to_link()
 	test -e mkreq.$$.x && (set +o noglob; rm -rf mkreq.$$.x*)
 	# Try to link.
 	$allcc ${1+"$@"} $ldflags -o mkreq.$$.x mkreq.$$.o -l${_lib} 2>/dev/null || return
+	case ${KSH_AUTOCONF_CROSS-} in
+	1)	return 0 ;;
+	esac
 	# To work around possible linker breakage, we have to
 	# actually run the test program, not merely link it.
 	./mkreq.$$.x

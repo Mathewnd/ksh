@@ -2,6 +2,92 @@ hdr	iconv
 lib	iconv_open,iconv_close,iconv iconv.h -liconv
 nxt	iconv
 
+tst	cross{
+	test "${KSH_AUTOCONF_CROSS-}" = 1 || exit 0
+	cat <<'!'
+#include <ast_common.h>
+#include <ccode.h>
+#if _hdr_iconv && defined(_nxt_iconv_str)
+#include _nxt_iconv
+#endif
+
+#define ICONV_VERSION		20110111L
+
+#define ICONV_FATAL		0x02
+#define ICONV_OMIT		0x04
+
+#define CC_ICONV		(-1)
+#define CC_UCS			(-2)
+#define CC_SCU			(-3)
+#define CC_UTF			(-4)
+#define CC_UME			(-5)
+
+#if _lib_iconv_open
+#ifndef _ICONV_LIST_PRIVATE_
+#undef	iconv_t
+#define	iconv_t		_ast_iconv_t
+#undef	iconv_f
+#define	iconv_f		_ast_iconv_f
+#undef	iconv_list_t
+#define	iconv_list_t	_ast_iconv_list_t
+#undef	iconv_open
+#define iconv_open	_ast_iconv_open
+#undef	iconv
+#define	iconv		_ast_iconv
+#undef	iconv_close
+#define iconv_close	_ast_iconv_close
+#undef	iconv_list
+#define iconv_list	_ast_iconv_list
+#undef	iconv_move
+#define iconv_move	_ast_iconv_move
+#undef	iconv_name
+#define iconv_name	_ast_iconv_name
+#undef	iconv_write
+#define iconv_write	_ast_iconv_write
+#endif
+#endif
+
+typedef int (*Iconv_error_f)(void*, void*, int, ...);
+
+typedef struct Iconv_disc_s
+{
+	uint32_t		version;
+	Iconv_error_f		errorf;
+	size_t			errors;
+	uint32_t		flags;
+	int			fill;
+} Iconv_disc_t;
+
+#if _lib_iconv_open
+typedef Ccmap_t _ast_iconv_list_t;
+typedef void* _ast_iconv_t;
+typedef size_t (*_ast_iconv_f)(_ast_iconv_t, char**, size_t*, char**, size_t*);
+
+#define iconv_init(d,e)		(memset(d,0,sizeof(*(d))),(d)->version=ICONV_VERSION,(d)->errorf=(Iconv_error_f)(e),(d)->fill=(-1))
+
+extern _ast_iconv_t	_ast_iconv_open(const char*, const char*);
+extern size_t		_ast_iconv(_ast_iconv_t, char**, size_t*, char**, size_t*);
+extern int		_ast_iconv_close(_ast_iconv_t);
+extern _ast_iconv_list_t*	_ast_iconv_list(_ast_iconv_list_t*);
+extern int		_ast_iconv_name(const char*, char*, size_t);
+#if _SFIO_H
+extern ssize_t		_ast_iconv_move(_ast_iconv_t, Sfio_t*, Sfio_t*, size_t, Iconv_disc_t*);
+extern ssize_t		_ast_iconv_write(_ast_iconv_t, Sfio_t*, char**, size_t*, Iconv_disc_t*);
+#else
+#if _SFSTDIO_H
+extern ssize_t		_ast_iconv_move(_ast_iconv_t, FILE*, FILE*, size_t, Iconv_disc_t*);
+extern ssize_t		_ast_iconv_write(_ast_iconv_t, FILE*, char**, size_t*, Iconv_disc_t*);
+#endif
+#endif
+#else
+typedef Ccmap_t iconv_list_t;
+typedef void* iconv_t;
+typedef size_t (*iconv_f)(iconv_t, char**, size_t*, char**, size_t*);
+#endif
+
+!
+}end
+
 tst	output{
 	#if !_lib_iconv_open
 	#define _undef_hdr_iconv	1

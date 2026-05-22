@@ -126,7 +126,8 @@ main(void)
 #endif
 }
 !
-if	$cc -o $tmp.exe $tmp.c >/dev/null 2>&1 && ./$tmp.exe
+if	$cc -o $tmp.exe $tmp.c >/dev/null 2>&1 &&
+	case ${KSH_AUTOCONF_CROSS-} in 1) false ;; *) ./$tmp.exe ;; esac
 then	LL_format='ll'
 else	LL_format='l'
 fi
@@ -149,7 +150,7 @@ main(void)
 }
 !
 if	$cc -o $tmp.exe $tmp.c >/dev/null 2>&1
-then	if	./$tmp.exe
+then	if	case ${KSH_AUTOCONF_CROSS-} in 1) false ;; *) ./$tmp.exe ;; esac
 	then	LL_suffix='LL'
 	else	LL_suffix='L'
 	fi
@@ -1122,7 +1123,8 @@ ${script}
 						'#'*)	./$tmp.sh $a > $tmp.x 2>/dev/null
 							x=$?
 							;;
-						*)	$cc $a -o $tmp.exe $tmp.c >/dev/null 2>&1 && ./$tmp.exe > $tmp.x 2>/dev/null
+						*)	$cc $a -o $tmp.exe $tmp.c >/dev/null 2>&1 &&
+							case ${KSH_AUTOCONF_CROSS-} in 1) false ;; *) ./$tmp.exe > $tmp.x 2>/dev/null ;; esac
 							x=$?
 							;;
 						esac
@@ -1269,7 +1271,8 @@ ${script}
 					'#'*)	./$tmp.sh $a > $tmp.x 2>/dev/null
 						x=$?
 						;;
-					*)	$cc $a -o $tmp.exe $tmp.c >/dev/null 2>&1 && ./$tmp.exe > $tmp.x 2>/dev/null
+					*)	$cc $a -o $tmp.exe $tmp.c >/dev/null 2>&1 &&
+						case ${KSH_AUTOCONF_CROSS-} in 1) false ;; *) ./$tmp.exe > $tmp.x 2>/dev/null ;; esac
 						x=$?
 						;;
 					esac

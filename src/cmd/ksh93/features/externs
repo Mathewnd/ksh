@@ -13,6 +13,14 @@ extern	nice		int	(int)
 extern	setreuid	int	(uid_t,uid_t)
 extern	setregid	int	(gid_t,gid_t)
 
+tst	- cross{
+	test "${KSH_AUTOCONF_CROSS-}" = 1 || exit 0
+	cat <<'!'
+#define _arg_extrabytes	sizeof(char*)	/* conservative cross-compilation default */
+#define NV_PID	(NV_INTEGER)	/* conservative cross-compilation default for pid_t */
+!
+}end
+
 tst	note{ does the system support #! interpreter paths }end cross{
 	cat > "$EXECROOT/file$$" <<!
 	#! $(command -v env) true
